@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VideoRatio — 16:9 → 5:4 Converter</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;700&display=swap');
+
+  :root {
+    --bg: #0e0e0f;
+    --surface: #161618;
+    --surface2: #1e1e21;
+    --border: #2a2a2e;
+    --accent: #e8ff47;
+    --accent2: #47ffe8;
+    --text: #f0f0f0;
+    --muted: #6b6b72;
+    --danger: #ff4747;
+    --success: #47ff8a;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px 60px;
+    overflow-x: hidden;
+  }
+
+  /* Subtle grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    opacity: 0.3;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container { position: relative; z-index: 1; width: 100%; max-width: 860px; }
+
+  /* Header */
+  header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 48px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .logo-tag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+
+  .logo-title {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    line-height: 1;
+  }
+
+  .logo-title span { color: var(--accent); }
+
+  .ratio-badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    text-align: right;
+    line-height: 1.6;
+  }
+
+  /* Cards */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 28px;
+    margin-bottom: 16px;
+    position: relative;
+    transition: border-color 0.2s;
+  }
+
+  .card:hover { border-color: #3a3a3e; }
+
+  .card-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .card-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* Drop Zone */
+  .drop-zone {
+    border: 1.5px dashed var(--border);
+    border-radius: 2px;
+    padding: 48px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--surface2);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .drop-zone::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, transparent 60%, rgba(232,255,71,0.03) 100%);
+    pointer-events: none;
+  }
+
+  .drop-zone:hover, .drop-zone.dragging {
+    border-color: var(--accent);
+    background: rgba(232, 255, 71, 0.04);
+  }
+
+  .drop-zone.has-file { border-style: solid; border-color: var(--accent); }
+
+  .drop-icon {
+    width: 48px; height: 48px;
+    margin: 0 auto 16px;
+    display: flex; align-items: center; justify-content: center;
+    border: 1.5px solid var(--border);
+    border-radius: 2px;
+    color: var(--muted);
+    transition: all 0.2s;
+  }
+
+  .drop-zone:hover .drop-icon, .drop-zone.has-file .drop-icon {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .drop-text-main {
+    font-size: 15px;
+    font-weight: 500;
+    margin-bottom: 6px;
+  }
+
+  .drop-text-sub {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .file-info {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    margin-top: 16px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+  }
+
+  .file-info.visible { display: flex; }
+
+  .file-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex-shrink: 0;
+    box-shadow: 0 0 8px var(--accent);
+  }
+
+  .file-name { color: var(--text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-size { color: var(--muted); flex-shrink: 0; }
+
+  /* Options Grid */
+  .options-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .option-group label {
+    display: block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  select, input[type="text"], input[type="range"] {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    padding: 10px 12px;
+    outline: none;
+    transition: border-color 0.2s;
+    appearance: none;
+  }
+
+  select:focus, input[type="text"]:focus { border-color: var(--accent); }
+
+  select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b6b72' stroke-width='1.5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 32px;
+    cursor: pointer;
+  }
+
+  /* Overlay Section */
+  .overlay-section { grid-column: 1 / -1; }
+
+  .overlay-drop {
+    border: 1.5px dashed var(--border);
+    border-radius: 2px;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--surface2);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .overlay-drop:hover { border-color: var(--accent2); background: rgba(71, 255, 232, 0.03); }
+  .overlay-drop.has-overlay { border-color: var(--accent2); border-style: solid; }
+
+  .overlay-preview-wrap {
+    width: 60px; height: 60px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
+    background: var(--bg);
+    position: relative;
+  }
+
+  .overlay-preview-wrap svg { color: var(--muted); }
+
+  #overlay-preview-img {
+    display: none;
+    width: 100%; height: 100%;
+    object-fit: contain;
+  }
+
+  .overlay-drop-text { text-align: left; flex: 1; }
+  .overlay-drop-text strong { display: block; font-size: 13px; font-weight: 500; margin-bottom: 4px; }
+  .overlay-drop-text span { font-size: 11px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; }
+
+  /* Overlay Controls */
+  .overlay-controls {
+    display: none;
+    grid-column: 1 / -1;
+    gap: 16px;
+    margin-top: 12px;
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+
+  .overlay-controls.visible { display: grid; }
+
+  .slider-wrap { display: flex; flex-direction: column; gap: 6px; }
+  .slider-wrap label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; display: flex; justify-content: space-between; }
+  .slider-val { color: var(--accent2); }
+
+  input[type="range"] {
+    padding: 0;
+    height: 4px;
+    cursor: pointer;
+    accent-color: var(--accent2);
+  }
+
+  /* Preview */
+  .preview-wrap {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+  }
+
+  .preview-box {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .preview-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .preview-frame {
+    background: #000;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .preview-frame-16 { aspect-ratio: 16/9; }
+  .preview-frame-5  { aspect-ratio: 5/4; }
+
+  .preview-placeholder {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    height: 100%; min-height: 100px;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    gap: 8px;
+    position: absolute; inset: 0;
+  }
+
+  canvas { display: block; width: 100%; height: 100%; }
+
+  .arrow-divider {
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column;
+    padding-top: 30px;
+    color: var(--accent);
+    gap: 4px;
+  }
+
+  .arrow-divider svg { animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+
+  /* Progress */
+  .progress-wrap {
+    display: none;
+    margin-top: 20px;
+  }
+
+  .progress-wrap.visible { display: block; }
+
+  .progress-bar-bg {
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    width: 0%;
+    transition: width 0.3s ease;
+    border-radius: 2px;
+  }
+
+  .progress-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* Button */
+  .btn-convert {
+    width: 100%;
+    padding: 18px;
+    background: var(--accent);
+    color: #0e0e0f;
+    border: none;
+    border-radius: 2px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+    overflow: hidden;
+    margin-top: 8px;
+  }
+
+  .btn-convert::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(255,255,255,0.15);
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  .btn-convert:hover::before { opacity: 1; }
+  .btn-convert:active { transform: scale(0.99); }
+  .btn-convert:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
+  .btn-convert:disabled::before { display: none; }
+
+  /* Log */
+  .log-box {
+    display: none;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 16px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.8;
+    max-height: 140px;
+    overflow-y: auto;
+    margin-top: 16px;
+  }
+
+  .log-box.visible { display: block; }
+  .log-line { padding: 1px 0; }
+  .log-line.ok { color: var(--success); }
+  .log-line.warn { color: var(--accent); }
+  .log-line.err { color: var(--danger); }
+  .log-line.info { color: var(--accent2); }
+
+  /* Download */
+  .download-btn {
+    display: none;
+    width: 100%;
+    padding: 16px;
+    background: transparent;
+    color: var(--success);
+    border: 1.5px solid var(--success);
+    border-radius: 2px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-top: 12px;
+    text-decoration: none;
+    text-align: center;
+  }
+
+  .download-btn:hover { background: rgba(71, 255, 138, 0.08); }
+  .download-btn.visible { display: block; }
+
+  /* Note */
+  .ffmpeg-note {
+    background: rgba(232, 255, 71, 0.05);
+    border: 1px solid rgba(232, 255, 71, 0.15);
+    border-left: 3px solid var(--accent);
+    border-radius: 2px;
+    padding: 14px 16px;
+    font-size: 12px;
+    color: #b0b0a0;
+    line-height: 1.6;
+    margin-top: 16px;
+  }
+
+  .ffmpeg-note strong { color: var(--accent); font-family: 'IBM Plex Mono', monospace; }
+
+  code {
+    font-family: 'IBM Plex Mono', monospace;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 2px 6px;
+    border-radius: 2px;
+    font-size: 11px;
+    color: var(--accent2);
+  }
+
+  input[type="file"] { display: none; }
+
+  /* Responsive */
+  @media (max-width: 600px) {
+    .options-grid { grid-template-columns: 1fr; }
+    .overlay-controls { grid-template-columns: 1fr 1fr; }
+    .preview-wrap { flex-direction: column; }
+    .arrow-divider { flex-direction: row; padding-top: 0; }
+    header { flex-direction: column; align-items: flex-start; gap: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <header>
+    <div class="logo">
+      <span class="logo-tag">// Video Tool</span>
+      <div class="logo-title">Ratio<span>Shift</span></div>
+    </div>
+    <div class="ratio-badge">
+      INPUT  → 16:9 (widescreen)<br>
+      OUTPUT → 5:4 (square-ish)
+    </div>
+  </header>
+
+  <!-- Video Input -->
+  <div class="card">
+    <div class="card-label">01 — Source Video</div>
+    <div class="drop-zone" id="video-drop" onclick="document.getElementById('video-input').click()">
+      <div class="drop-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="2" y="2" width="20" height="20" rx="2"/>
+          <polygon points="10,8 16,12 10,16"/>
+        </svg>
+      </div>
+      <div class="drop-text-main">Drop MPEG video here</div>
+      <div class="drop-text-sub">.mpg · .mpeg · .mp4 · .mov · .avi</div>
+    </div>
+    <input type="file" id="video-input" accept="video/*,.mpg,.mpeg">
+    <div class="file-info" id="video-file-info">
+      <div class="file-dot"></div>
+      <span class="file-name" id="video-file-name"></span>
+      <span class="file-size" id="video-file-size"></span>
+    </div>
+  </div>
+
+  <!-- Options -->
+  <div class="card">
+    <div class="card-label">02 — Conversion Settings</div>
+    <div class="options-grid">
+
+      <div class="option-group">
+        <label>Output Resolution</label>
+        <select id="resolution">
+          <option value="1280x1024">1280 × 1024 (5:4 HD)</option>
+          <option value="1024x819">1024 × 819</option>
+          <option value="800x640">800 × 640</option>
+          <option value="640x512">640 × 512</option>
+          <option value="custom">Custom…</option>
+        </select>
+      </div>
+
+      <div class="option-group">
+        <label>Crop / Fit Mode</label>
+        <select id="fit-mode">
+          <option value="crop_center">Crop Center (fills frame)</option>
+          <option value="letterbox">Letterbox (add bars)</option>
+          <option value="stretch">Stretch (distort)</option>
+          <option value="blur_bg">Blur Background Fill</option>
+        </select>
+      </div>
+
+      <div class="option-group" id="custom-w-group" style="display:none">
+        <label>Width (px)</label>
+        <input type="text" id="custom-w" placeholder="e.g. 1280">
+      </div>
+      <div class="option-group" id="custom-h-group" style="display:none">
+        <label>Height (px)</label>
+        <input type="text" id="custom-h" placeholder="e.g. 1024">
+      </div>
+
+      <!-- Overlay -->
+      <div class="option-group overlay-section">
+        <label style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:block">
+          Overlay Image (top-left marketing logo)
+        </label>
+        <div class="overlay-drop" id="overlay-drop" onclick="document.getElementById('overlay-input').click()">
+          <div class="overlay-preview-wrap">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/>
+              <path d="M21 15l-5-5L5 21"/>
+            </svg>
+            <img id="overlay-preview-img" alt="overlay preview">
+          </div>
+          <div class="overlay-drop-text">
+            <strong>Add overlay image</strong>
+            <span>PNG with transparency recommended · .png · .svg · .jpg</span>
+          </div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--accent2);flex-shrink:0">OPTIONAL</div>
+        </div>
+        <input type="file" id="overlay-input" accept="image/*">
+      </div>
+
+      <!-- Overlay controls -->
+      <div class="overlay-controls" id="overlay-controls">
+        <div class="slider-wrap">
+          <label>Opacity <span class="slider-val" id="opacity-val">100%</span></label>
+          <input type="range" id="opacity-slider" min="10" max="100" value="100">
+        </div>
+        <div class="slider-wrap">
+          <label>Scale <span class="slider-val" id="scale-val">20%</span></label>
+          <input type="range" id="scale-slider" min="5" max="60" value="20">
+        </div>
+        <div class="slider-wrap">
+          <label>Margin <span class="slider-val" id="margin-val">16px</span></label>
+          <input type="range" id="margin-slider" min="0" max="80" value="16">
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Preview -->
+  <div class="card">
+    <div class="card-label">03 — Preview</div>
+    <div class="preview-wrap">
+      <div class="preview-box">
+        <div class="preview-label">Source · 16:9</div>
+        <div class="preview-frame preview-frame-16">
+          <div class="preview-placeholder" id="src-placeholder">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2" y="2" width="20" height="20" rx="2"/><polygon points="10,8 16,12 10,16"/></svg>
+            No video loaded
+          </div>
+          <video id="src-video" style="display:none;width:100%;height:100%;object-fit:contain;" muted></video>
+        </div>
+      </div>
+
+      <div class="arrow-divider">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M5 12h14M13 6l6 6-6 6"/>
+        </svg>
+      </div>
+
+      <div class="preview-box">
+        <div class="preview-label">Output · 5:4</div>
+        <div class="preview-frame preview-frame-5" style="cursor:default">
+          <div class="preview-placeholder" id="dst-placeholder">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M3 9h18"/></svg>
+            Preview here
+          </div>
+          <canvas id="preview-canvas" style="display:none;position:absolute;inset:0;width:100%;height:100%;"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Convert -->
+  <div class="card">
+    <div class="card-label">04 — Export</div>
+    <button class="btn-convert" id="convert-btn" disabled>Convert &amp; Download</button>
+
+    <div class="progress-wrap" id="progress-wrap">
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="progress-fill"></div></div>
+      <div class="progress-label">
+        <span id="progress-status">Processing…</span>
+        <span id="progress-pct">0%</span>
+      </div>
+    </div>
+
+    <div class="log-box" id="log-box"></div>
+    <a class="download-btn" id="download-link">↓ Download Converted Video</a>
+
+    <div class="ffmpeg-note">
+      <strong>// How this works</strong><br>
+      This tool uses the <strong>WebCodecs API</strong> + <strong>Canvas</strong> to process video entirely in your browser — no upload needed. For large files or maximum compatibility, the tool generates a ready-to-run <strong>FFmpeg command</strong> you can run locally.<br><br>
+      <strong>FFmpeg equivalent:</strong><br>
+      <code id="ffmpeg-cmd">ffmpeg -i input.mpg -vf "crop=ih*5/4:ih,scale=1280:1024" -c:a copy output.mp4</code>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ─── State ─────────────────────────────────────────────────────────────────
+let videoFile = null;
+let overlayFile = null;
+let overlayImg = null;
+let videoEl = document.getElementById('src-video');
+let canvas = document.getElementById('preview-canvas');
+let ctx = canvas.getContext('2d');
+let animFrame = null;
+
+// ─── Video Input ────────────────────────────────────────────────────────────
+const videoDrop = document.getElementById('video-drop');
+
+videoDrop.addEventListener('dragover', e => { e.preventDefault(); videoDrop.classList.add('dragging'); });
+videoDrop.addEventListener('dragleave', () => videoDrop.classList.remove('dragging'));
+videoDrop.addEventListener('drop', e => {
+  e.preventDefault();
+  videoDrop.classList.remove('dragging');
+  const f = e.dataTransfer.files[0];
+  if (f && f.type.startsWith('video/')) loadVideo(f);
+});
+
+document.getElementById('video-input').addEventListener('change', e => {
+  if (e.target.files[0]) loadVideo(e.target.files[0]);
+});
+
+function loadVideo(f) {
+  videoFile = f;
+  videoDrop.classList.add('has-file');
+  document.getElementById('video-file-name').textContent = f.name;
+  document.getElementById('video-file-size').textContent = formatSize(f.size);
+  document.getElementById('video-file-info').classList.add('visible');
+
+  const url = URL.createObjectURL(f);
+  videoEl.src = url;
+  videoEl.style.display = 'block';
+  document.getElementById('src-placeholder').style.display = 'none';
+
+  videoEl.onloadedmetadata = () => {
+    log(`Loaded: ${f.name}`, 'ok');
+    log(`Resolution: ${videoEl.videoWidth} × ${videoEl.videoHeight}`, 'info');
+    log(`Duration: ${videoEl.duration.toFixed(2)}s`, 'info');
+    updateFFmpegCmd();
+    checkReady();
+    startPreview();
+  };
+}
+
+// ─── Overlay Input ──────────────────────────────────────────────────────────
+const overlayDrop = document.getElementById('overlay-drop');
+
+overlayDrop.addEventListener('dragover', e => { e.preventDefault(); overlayDrop.style.borderColor = 'var(--accent2)'; });
+overlayDrop.addEventListener('dragleave', () => overlayDrop.style.borderColor = '');
+overlayDrop.addEventListener('drop', e => {
+  e.preventDefault();
+  const f = e.dataTransfer.files[0];
+  if (f && f.type.startsWith('image/')) loadOverlay(f);
+});
+
+document.getElementById('overlay-input').addEventListener('change', e => {
+  if (e.target.files[0]) loadOverlay(e.target.files[0]);
+});
+
+function loadOverlay(f) {
+  overlayFile = f;
+  overlayDrop.classList.add('has-overlay');
+  const url = URL.createObjectURL(f);
+  const previewImg = document.getElementById('overlay-preview-img');
+  previewImg.src = url;
+  previewImg.style.display = 'block';
+  previewImg.previousElementSibling && (previewImg.previousElementSibling.style.display = 'none');
+
+  overlayImg = new Image();
+  overlayImg.src = url;
+  overlayImg.onload = () => {
+    document.getElementById('overlay-controls').classList.add('visible');
+    log(`Overlay: ${f.name} (${overlayImg.naturalWidth}×${overlayImg.naturalHeight})`, 'info');
+    updateFFmpegCmd();
+  };
+}
+
+// ─── Slider Controls ────────────────────────────────────────────────────────
+function bindSlider(id, valId, suffix) {
+  const slider = document.getElementById(id);
+  const val = document.getElementById(valId);
+  slider.addEventListener('input', () => { val.textContent = slider.value + suffix; });
+}
+
+bindSlider('opacity-slider', 'opacity-val', '%');
+bindSlider('scale-slider', 'scale-val', '%');
+bindSlider('margin-slider', 'margin-val', 'px');
+
+// ─── Resolution & Mode ──────────────────────────────────────────────────────
+document.getElementById('resolution').addEventListener('change', function() {
+  const isCustom = this.value === 'custom';
+  document.getElementById('custom-w-group').style.display = isCustom ? '' : 'none';
+  document.getElementById('custom-h-group').style.display = isCustom ? '' : 'none';
+  updateFFmpegCmd();
+});
+
+document.getElementById('fit-mode').addEventListener('change', updateFFmpegCmd);
+
+// ─── FFmpeg Command Generator ────────────────────────────────────────────────
+function updateFFmpegCmd() {
+  const res = document.getElementById('resolution').value;
+  const [w, h] = res === 'custom' ? [
+    document.getElementById('custom-w').value || '1280',
+    document.getElementById('custom-h').value || '1024'
+  ] : res.split('x');
+  const mode = document.getElementById('fit-mode').value;
+
+  let vf = '';
+  if (mode === 'crop_center')  vf = `crop=ih*${w}/${h}:ih,scale=${w}:${h}`;
+  if (mode === 'letterbox')    vf = `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2:black`;
+  if (mode === 'stretch')      vf = `scale=${w}:${h}`;
+  if (mode === 'blur_bg')      vf = `[0:v]scale=${w}:${h},boxblur=20[bg];[0:v]scale=iw*min(${w}/iw\\,${h}/ih):ih*min(${w}/iw\\,${h}/ih)[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2`;
+
+  let overlayPart = '';
+  if (overlayFile) {
+    const scale = document.getElementById('scale-slider').value;
+    const margin = document.getElementById('margin-slider').value;
+    const opacity = (document.getElementById('opacity-slider').value / 100).toFixed(2);
+    overlayPart = `, overlay=${margin}:${margin}:format=auto`;
+  }
+
+  const fname = videoFile ? videoFile.name : 'input.mpg';
+  const cmd = overlayFile
+    ? `ffmpeg -i "${fname}" -i overlay.png -filter_complex "${vf}[v];[1:v]scale=iw*0.2:-1,format=rgba,colorchannelmixer=aa=${(document.getElementById('opacity-slider').value/100).toFixed(2)}[ol];[v][ol]overlay=${document.getElementById('margin-slider').value}:${document.getElementById('margin-slider').value}" -c:a copy output.mp4`
+    : `ffmpeg -i "${fname}" -vf "${vf}" -c:a copy output.mp4`;
+
+  document.getElementById('ffmpeg-cmd').textContent = cmd;
+}
+
+// ─── Live Preview ────────────────────────────────────────────────────────────
+function startPreview() {
+  canvas.style.display = 'block';
+  document.getElementById('dst-placeholder').style.display = 'none';
+
+  videoEl.play().catch(() => {});
+  videoEl.loop = true;
+  videoEl.muted = true;
+
+  function drawFrame() {
+    if (videoEl.readyState < 2) { animFrame = requestAnimationFrame(drawFrame); return; }
+
+    const targetW = canvas.parentElement.clientWidth || 200;
+    const targetH = canvas.parentElement.clientHeight || 160;
+    canvas.width = targetW;
+    canvas.height = targetH;
+
+    const mode = document.getElementById('fit-mode').value;
+    const vw = videoEl.videoWidth;
+    const vh = videoEl.videoHeight;
+    const targetAspect = 5 / 4;
+
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, targetW, targetH);
+
+    if (mode === 'crop_center') {
+      const srcW = Math.min(vw, vh * targetAspect);
+      const srcH = srcW / targetAspect;
+      const sx = (vw - srcW) / 2;
+      const sy = (vh - srcH) / 2;
+      ctx.drawImage(videoEl, sx, sy, srcW, srcH, 0, 0, targetW, targetH);
+
+    } else if (mode === 'letterbox') {
+      const scale = Math.min(targetW / vw, targetH / vh);
+      const dw = vw * scale, dh = vh * scale;
+      const dx = (targetW - dw) / 2, dy = (targetH - dh) / 2;
+      ctx.drawImage(videoEl, dx, dy, dw, dh);
+
+    } else if (mode === 'stretch') {
+      ctx.drawImage(videoEl, 0, 0, targetW, targetH);
+
+    } else if (mode === 'blur_bg') {
+      // Blurred background
+      ctx.filter = 'blur(14px)';
+      ctx.drawImage(videoEl, -20, -20, targetW + 40, targetH + 40);
+      ctx.filter = 'none';
+      // Centered original
+      const scale = Math.min(targetW / vw, targetH / vh);
+      const dw = vw * scale, dh = vh * scale;
+      ctx.drawImage(videoEl, (targetW - dw) / 2, (targetH - dh) / 2, dw, dh);
+    }
+
+    // Draw overlay
+    if (overlayImg && overlayImg.complete) {
+      const scale = document.getElementById('scale-slider').value / 100;
+      const margin = parseInt(document.getElementById('margin-slider').value);
+      const opacity = document.getElementById('opacity-slider').value / 100;
+      const ow = overlayImg.naturalWidth * scale * (targetW / 1280);
+      const oh = overlayImg.naturalHeight * scale * (targetW / 1280);
+      ctx.save();
+      ctx.globalAlpha = opacity;
+      ctx.drawImage(overlayImg, margin, margin, ow, oh);
+      ctx.restore();
+    }
+
+    animFrame = requestAnimationFrame(drawFrame);
+  }
+
+  if (animFrame) cancelAnimationFrame(animFrame);
+  animFrame = requestAnimationFrame(drawFrame);
+}
+
+// ─── Convert (browser-based frame extraction) ───────────────────────────────
+document.getElementById('convert-btn').addEventListener('click', convert);
+
+async function convert() {
+  if (!videoFile) return;
+
+  const btn = document.getElementById('convert-btn');
+  btn.disabled = true;
+  btn.textContent = 'Processing…';
+
+  showProgress(true);
+  log('Starting conversion…', 'warn');
+
+  const res = document.getElementById('resolution').value;
+  const [outW, outH] = res === 'custom' ? [
+    parseInt(document.getElementById('custom-w').value) || 1280,
+    parseInt(document.getElementById('custom-h').value) || 1024
+  ] : res.split('x').map(Number);
+  const mode = document.getElementById('fit-mode').value;
+
+  try {
+    // We'll use MediaRecorder + canvas to re-encode
+    const offscreen = document.createElement('canvas');
+    offscreen.width = outW;
+    offscreen.height = outH;
+    const offCtx = offscreen.getContext('2d');
+
+    // Create a fresh video for conversion
+    const convVideo = document.createElement('video');
+    convVideo.src = URL.createObjectURL(videoFile);
+    convVideo.muted = true;
+
+    await new Promise(r => { convVideo.onloadedmetadata = r; });
+    log(`Duration: ${convVideo.duration.toFixed(1)}s · Output: ${outW}×${outH}`, 'info');
+
+    const stream = offscreen.captureStream(30);
+    const recorder = new MediaRecorder(stream, {
+      mimeType: getSupportedMime(),
+      videoBitsPerSecond: 8_000_000
+    });
+
+    const chunks = [];
+    recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+
+    recorder.start(100);
+    convVideo.play();
+
+    const duration = convVideo.duration;
+    let done = false;
+
+    convVideo.ontimeupdate = () => {
+      const pct = Math.min((convVideo.currentTime / duration) * 100, 99);
+      setProgress(pct, `Encoding frame ${convVideo.currentTime.toFixed(1)}s / ${duration.toFixed(1)}s`);
+      drawConvFrame(offCtx, convVideo, outW, outH, mode);
+    };
+
+    convVideo.onended = () => { done = true; };
+
+    await new Promise(resolve => {
+      const check = setInterval(() => {
+        if (done || convVideo.currentTime >= duration - 0.1) {
+          clearInterval(check);
+          recorder.stop();
+          setTimeout(resolve, 300);
+        }
+      }, 200);
+    });
+
+    setProgress(100, 'Finalizing…');
+
+    const blob = new Blob(chunks, { type: recorder.mimeType });
+    const url = URL.createObjectURL(blob);
+    const dl = document.getElementById('download-link');
+    dl.href = url;
+    const ext = recorder.mimeType.includes('webm') ? 'webm' : 'mp4';
+    dl.download = videoFile.name.replace(/\.[^.]+$/, '') + `_5x4_${outW}x${outH}.${ext}`;
+    dl.classList.add('visible');
+
+    log(`Done! ${formatSize(blob.size)} · ${ext.toUpperCase()}`, 'ok');
+    log(`Note: For .mpg output run the FFmpeg command shown below.`, 'warn');
+    btn.textContent = 'Convert Again';
+    btn.disabled = false;
+
+  } catch (err) {
+    log('Error: ' + err.message, 'err');
+    log('Use the FFmpeg command below for full format support.', 'warn');
+    btn.textContent = 'Convert & Download';
+    btn.disabled = false;
+    setProgress(0, '');
+  }
+}
+
+function drawConvFrame(offCtx, vid, outW, outH, mode) {
+  const vw = vid.videoWidth, vh = vid.videoHeight;
+  const targetAspect = 5 / 4;
+
+  offCtx.fillStyle = '#000';
+  offCtx.fillRect(0, 0, outW, outH);
+
+  if (mode === 'crop_center') {
+    const srcW = Math.min(vw, vh * targetAspect);
+    const srcH = srcW / targetAspect;
+    offCtx.drawImage(vid, (vw - srcW) / 2, (vh - srcH) / 2, srcW, srcH, 0, 0, outW, outH);
+  } else if (mode === 'letterbox') {
+    const scale = Math.min(outW / vw, outH / vh);
+    offCtx.drawImage(vid, (outW - vw*scale)/2, (outH - vh*scale)/2, vw*scale, vh*scale);
+  } else if (mode === 'stretch') {
+    offCtx.drawImage(vid, 0, 0, outW, outH);
+  } else if (mode === 'blur_bg') {
+    offCtx.filter = 'blur(20px)';
+    offCtx.drawImage(vid, -30, -30, outW + 60, outH + 60);
+    offCtx.filter = 'none';
+    const scale = Math.min(outW / vw, outH / vh);
+    offCtx.drawImage(vid, (outW - vw*scale)/2, (outH - vh*scale)/2, vw*scale, vh*scale);
+  }
+
+  if (overlayImg && overlayImg.complete) {
+    const scale = document.getElementById('scale-slider').value / 100;
+    const margin = parseInt(document.getElementById('margin-slider').value);
+    const opacity = document.getElementById('opacity-slider').value / 100;
+    offCtx.save();
+    offCtx.globalAlpha = opacity;
+    offCtx.drawImage(overlayImg, margin, margin, overlayImg.naturalWidth * scale, overlayImg.naturalHeight * scale);
+    offCtx.restore();
+  }
+}
+
+function getSupportedMime() {
+  const types = ['video/mp4;codecs=avc1', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+  return types.find(t => MediaRecorder.isTypeSupported(t)) || 'video/webm';
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function checkReady() {
+  document.getElementById('convert-btn').disabled = !videoFile;
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+  return (bytes/1024/1024).toFixed(1) + ' MB';
+}
+
+function log(msg, type = '') {
+  const box = document.getElementById('log-box');
+  box.classList.add('visible');
+  const line = document.createElement('div');
+  line.className = 'log-line ' + type;
+  const prefix = { ok: '✓ ', warn: '⚠ ', err: '✗ ', info: '→ ' }[type] || '';
+  line.textContent = prefix + msg;
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
+}
+
+function showProgress(show) {
+  document.getElementById('progress-wrap').classList.toggle('visible', show);
+}
+
+function setProgress(pct, status) {
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('progress-pct').textContent = Math.round(pct) + '%';
+  if (status) document.getElementById('progress-status').textContent = status;
+}
+</script>
+</body>
+</html>
